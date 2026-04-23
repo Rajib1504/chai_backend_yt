@@ -11,7 +11,7 @@ const storage = multer.diskStorage({
 cb(null,file.originalname)
   }
 })
-
+// inside this storage we will get the local file url
 export const upload = multer({
        storage,
  })
