@@ -57,7 +57,30 @@ userSchema.pre("savePassword", async function (next) {
 
 // custom method to compare password for login
 userSchema.methods.isPasswordCorrect = async function (password) {
- return await bcrypt.compare(password, this.password);
+  return await bcrypt.compare(password, this.password);
+};
+
+userSchema.methods.generateAccessToken = function () {
+  return jwt.sign(
+    {
+      _id: this._id,
+      email: this.email,
+      username: this.username,
+    },
+    process.env.JWT_ACCESS_SECRET,
+    { expiresIn: process.env.ACCESS_TOKEN_EXPIRE }
+  );
+};
+userSchema.methods.generateRefreshToken = function () {
+  return jwt.sign(
+    {
+      _id: this._id,
+    },
+    process.env.JWT_REFRESH_SECRET,
+    {
+      expiresIn: process.env.REFRESH_TOKEN_EXPIRE,
+    }
+  );
 };
 
 export const User = mongoose.model("User", userSchema);
