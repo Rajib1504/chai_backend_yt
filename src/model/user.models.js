@@ -51,7 +51,7 @@ const userSchema = new Schema(
 // middlewear to hash password before saving DB
 userSchema.pre("savePassword", async function (next) {
   if (!this.isModified("password")) return next(); // agar passward modify nehi hua hain toh return kardo next karke
-  this.password = bcrypt.hash(this.password, 10);
+  this.password = await bcrypt.hash(this.password, 10);
   next(); // agar modified hua hain toh hash kardo
 });
 
