@@ -1,11 +1,12 @@
 import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 const userSchema = new Schema(
   {
     username: {
       type: String,
       lowercase: true,
-      requierd: true,
+      required: true,
       trim: true,
       unique: true,
       index: true,
@@ -13,32 +14,34 @@ const userSchema = new Schema(
     email: {
       type: String,
       lowercase: true,
-      requierd: true,
+      required: true,
       trim: true,
       unique: true,
     },
-    fullname: {
+    fullName: {
       type: String,
       lowercase: true,
-      requierd: true,
+      required: true,
       index: true,
     },
     password: {
       type: String,
-      requierd: [true, "password is required"],
+      required: [true, "password is required"],
       trim: true,
     },
     avatar: {
       type: String, //cloudinary url
-      requierd: [true, "avatar image required"],
+      required: [true, "avatar image required"],
     },
-    coverimage: {
+    coverImage: {
       type: String, //cloudinary url
     },
-    watchhistory: {
-      type: Schema.Types.ObjectId,
-      ref: "Video",
-    },
+    watchHistory: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Video",
+      },
+    ],
     refreshToken: {
       type: String,
     },
@@ -49,10 +52,9 @@ const userSchema = new Schema(
 );
 
 // middlewear to hash password before saving DB
-userSchema.pre("savePassword", async function (next) {
-  if (!this.isModified("password")) return next(); // agar passward modify nehi hua hain toh return kardo next karke
+userSchema.pre("save", async function () {
+  if (!this.isModified("password")) return; // agar passward modify nehi hua hain toh return kardo next karke
   this.password = await bcrypt.hash(this.password, 10);
-  next(); // agar modified hua hain toh hash kardo
 });
 
 // custom method to compare password for login

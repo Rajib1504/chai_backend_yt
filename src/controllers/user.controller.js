@@ -16,11 +16,12 @@ const registerUser = ashyncHandler(async (req, res) => {
   //check for uer creation
   //send response to client
 
-  const { username, email, fullname, password } = req.body;
+  const { username, email, fullName, password } = req.body;
+  // console.log({ username, email, fullName, password });
 
   // validation
   if (
-    [username, email, fullname, password].some((field) => field.trim() === "")
+    [username, email, fullName, password].some((field) => field?.trim() === "")
   ) {
     throw new ApiError(400, "All fields are required");
   }
@@ -35,24 +36,25 @@ const registerUser = ashyncHandler(async (req, res) => {
   }
 
   // file check
-  const avatartLocalPath = req?.files?.avatar[0]?.path;
-  const coverImageLocalPath = req?.files?.coverimage[0]?.path;
+  const avatarLocalPath = req?.files?.avatar?.[0]?.path;
+  const coverImageLocalPath = req?.files?.coverImage?.[0]?.path;
 
-  if (avatartLocalPath) {
-    throw new ApiError(400, "Avatar file is required");
+  // console.log(avatarLocalPath);
+  if (!avatarLocalPath) {
+    throw new ApiError(400, "Avatar file is required from reqest");
   }
 
   //upload to cloudinary
-  const avatar = await UploadInCloudinary(avatartLocalPath);
+  const avatar = await UploadInCloudinary(avatarLocalPath);
   const coverImage = await UploadInCloudinary(coverImageLocalPath);
 
-  if (avatar) {
-    throw new ApiError(400, "Avatar file is required");
+  if (!avatar) {
+    throw new ApiError(400, "Avatar file is required from local path");
   }
 
   //user object
-  const user = User.create({
-    fullname,
+  const user = await User.create({
+    fullName,
     email,
     avatar: avatar.url,
     coverImage: coverImage?.url || "",
@@ -71,7 +73,7 @@ const registerUser = ashyncHandler(async (req, res) => {
 
   return res
     .status(201)
-    .json(new ApiResponse(200, createdUser, "User registered successfully"));
+    .json(new ApiResponse(201, "User registered successfully", createdUser));
 });
 
 export { registerUser };
