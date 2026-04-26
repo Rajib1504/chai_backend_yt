@@ -128,25 +128,25 @@ if(!user) throw new ApiError(404,"User does not exist")
   // now we will update the object for response by removing password and refresh token and adding access token in it also will sent the cookies to client and send the response to client without making another db call
   // 1 way 
 
-   const loginResponse = {
-    _id:user._id,
-    email:user.email,
-    username:user.username,
-    fullName:user.fullName,
-    avatar:user.avatar,
-    coverImage:user.coverImage,
-    accessToken,
-    refreshToken
-   }
- //  cookie option
-    const options ={
-      httpOnly:true,
-      secure:true,
-    }
-    return res.status(200)
-    .cookie("accessToken", accessToken, options)
-    .cookie("refreshToken", refreshToken, options)
-    json(new ApiResponse(200, "User logged in successfully",{user:loginResponse,accessToken,refreshToken}));
+//    const loginResponse = {
+//     _id:user._id,
+//     email:user.email,
+//     username:user.username,
+//     fullName:user.fullName,
+//     avatar:user.avatar,
+//     coverImage:user.coverImage,
+//     accessToken,
+//     refreshToken
+//    }
+//  //  cookie option
+//     const options ={
+//       httpOnly:true,
+//       secure:true,
+//     }
+//     return res.status(200)
+//     .cookie("accessToken", accessToken, options)
+//     .cookie("refreshToken", refreshToken, options)
+//     json(new ApiResponse(200, "User logged in successfully",{user:loginResponse,accessToken,refreshToken}));
 
 
     // we can also make a another db call if its not so costly here the desicion is to make one more db call or to update the user object by removing password and refresh token and adding access token in it and send it as response without making another db call
@@ -166,6 +166,32 @@ if(!user) throw new ApiError(404,"User does not exist")
       user: userResponse,accessToken,refreshToken
     }))
 
+const logOutUser = ashyncHandler(async(req,res)=>{
+  //take refresh token from cookie
+  //validate refresh token
+  //find user with this refresh token
+  //if user not found send error response
+  //remove refresh token from database
+  //clear cookie from client
+  //send response to client
+  //this all work in our middlewear jwtVerify
+  const user = await User.findByIdAndUpdate(req.user._id,{
+    $set:{
+      refreshToken:undefined
+    }},
+    {
+      new:true
+   })
+
+  //  cookie option
+    const options ={
+      httpOnly:true,
+      secure:true,
+    }
+
+    res.status(200).clearCookie("accessToken",options).clearCookie("refreshToken",options).json(new ApiResponse(200,"User logged out",{}))
+})
+
 
 
 
@@ -176,4 +202,4 @@ if(!user) throw new ApiError(404,"User does not exist")
 
 
 
-export { registerUser,loginUser }
+export { registerUser,loginUser,logOutUser }
