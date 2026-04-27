@@ -4,24 +4,23 @@ import { User } from "../model/user.models.js";
 import { UploadInCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
-const generateAccessandRefreshToken= async(userId)=>{
+const generateAccessandRefreshToken = async (userId) => {
   try {
-   const user= await User.findById(userId)
+    const user = await User.findById(userId);
 
-   const accessToken = user.generateAccessToken()
-   const refreshToken = user.generateRefreshToken()
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
 
-  //  save refresh token in Db 
-   user.refreshToken = await refreshToken
-    await user.save({validateBeforeSave:false})
+    //  save refresh token in Db
+    user.refreshToken = await refreshToken;
+    await user.save({ validateBeforeSave: false });
 
- //return the access and refresh token in user object 
-    return {accessToken,refreshToken}
-
+    //return the access and refresh token in user object
+    return { accessToken, refreshToken };
   } catch (error) {
-    throw new ApiError(500,"something went worng while generating token")
+    throw new ApiError(500, "something went worng while generating token");
   }
-}
+};
 const registerUser = ashyncHandler(async (req, res) => {
   //take data from user
   //validate data
@@ -104,69 +103,83 @@ const loginUser = ashyncHandler(async (req, res) => {
   //save refresh token in database
   //send response to client with access token and user data
 
-  const {email,username,password} = req.body;
+  const { email, username, password } = req.body;
 
-  if([email,username,password].some((field)=>field?.trim()==="")
-  ){
-    throw new ApiError(400,"All fields are required")
+  if ([email, username, password].some((field) => field?.trim() === "")) {
+    throw new ApiError(400, "All fields are required");
   }
+  // alternative;
+  //   if (!username && !email) {
+  //     throw new ApiError(400, "username or email is required")
+  // }
 
+  // Here is an alternative of above code based on logic discussed in video:
+  // if (!(username || email)) {
+  //     throw new ApiError(400, "username or email is required")
+
+  // }
 
   const user = await User.findOne({
-    $or:[{email},{userneame}]
-  })
-if(!user) throw new ApiError(404,"User does not exist")
+    $or: [{ email }, { username }],
+  });
+  if (!user) throw new ApiError(404, "User does not exist");
 
+  const passwordCheck = user.isPasswordCorrect(password);
+  if (!passwordCheck) throw new ApiError(401, "Invalid credential");
 
-  const passwordCheck = user.isPasswordCorrect(password)
-  if(!passwordCheck) throw new ApiError(401, "Invalid credential")
-
-
-    //access and refresh token 
-   const{accessToken,refreshToken}= await generateAccessandRefreshToken(user._id)
+  //access and refresh token
+  const { accessToken, refreshToken } = await generateAccessandRefreshToken(
+    user._id
+  );
 
   // now we will update the object for response by removing password and refresh token and adding access token in it also will sent the cookies to client and send the response to client without making another db call
-  // 1 way 
+  // 1 way
 
-//    const loginResponse = {
-//     _id:user._id,
-//     email:user.email,
-//     username:user.username,
-//     fullName:user.fullName,
-//     avatar:user.avatar,
-//     coverImage:user.coverImage,
-//     accessToken,
-//     refreshToken
-//    }
-//  //  cookie option
-//     const options ={
-//       httpOnly:true,
-//       secure:true,
-//     }
-//     return res.status(200)
-//     .cookie("accessToken", accessToken, options)
-//     .cookie("refreshToken", refreshToken, options)
-//     json(new ApiResponse(200, "User logged in successfully",{user:loginResponse,accessToken,refreshToken}));
+  //    const loginResponse = {
+  //     _id:user._id,
+  //     email:user.email,
+  //     username:user.username,
+  //     fullName:user.fullName,
+  //     avatar:user.avatar,
+  //     coverImage:user.coverImage,
+  //     accessToken,
+  //     refreshToken
+  //    }
+  //  //  cookie option
+  //     const options ={
+  //       httpOnly:true,
+  //       secure:true,
+  //     }
+  //     return res.status(200)
+  //     .cookie("accessToken", accessToken, options)
+  //     .cookie("refreshToken", refreshToken, options)
+  //     json(new ApiResponse(200, "User logged in successfully",{user:loginResponse,accessToken,refreshToken}));
 
+  // we can also make a another db call if its not so costly here the desicion is to make one more db call or to update the user object by removing password and refresh token and adding access token in it and send it as response without making another db call
+  // 2nd way
+  const userResponse = await User.findById(user._id).select(
+    "-password -refreshToken"
+  );
 
-    // we can also make a another db call if its not so costly here the desicion is to make one more db call or to update the user object by removing password and refresh token and adding access token in it and send it as response without making another db call
-    // 2nd way 
-     const userResponse = await User.findById(user._id).select("-password -refreshToken")
-
-    //  cookie option
-    const options ={
-      httpOnly:true,
-      secure:true,
-    }
-    //after setting this you can only modify the cookie from backend and not from frontend and secure true means cookie will only be sent on https connection
-    return res.status(200).
-    cookie("refreshToken",refreshToken,options).
-    cookie("accessToken",accessToken,options).
-    json(new ApiResponse(200,"User logged in successfully",{
-      user: userResponse,accessToken,refreshToken
-    }))
-
-const logOutUser = ashyncHandler(async(req,res)=>{
+  //  cookie option
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+  //after setting this you can only modify the cookie from backend and not from frontend and secure true means cookie will only be sent on https connection
+  return res
+    .status(200)
+    .cookie("refreshToken", refreshToken, options)
+    .cookie("accessToken", accessToken, options)
+    .json(
+      new ApiResponse(200, "User logged in successfully", {
+        user: userResponse,
+        accessToken,
+        refreshToken,
+      })
+    );
+});
+const logOutUser = ashyncHandler(async (req, res) => {
   //take refresh token from cookie
   //validate refresh token
   //find user with this refresh token
@@ -175,31 +188,29 @@ const logOutUser = ashyncHandler(async(req,res)=>{
   //clear cookie from client
   //send response to client
   //this all work in our middlewear jwtVerify
-  const user = await User.findByIdAndUpdate(req.user._id,{
-    $set:{
-      refreshToken:undefined
-    }},
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
     {
-      new:true
-   })
+      $set: {
+        refreshToken: undefined,
+      },
+    },
+    {
+      new: true,
+    }
+  );
 
   //  cookie option
-    const options ={
-      httpOnly:true,
-      secure:true,
-    }
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
 
-    res.status(200).clearCookie("accessToken",options).clearCookie("refreshToken",options).json(new ApiResponse(200,"User logged out",{}))
-})
+  res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, "User logged out", {}));
+});
 
-
-
-
-
-
-  }),
-
-
-
-
-export { registerUser,loginUser,logOutUser }
+export { registerUser, loginUser, logOutUser };
