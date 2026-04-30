@@ -269,5 +269,64 @@ const refreshAndAccesstoken = ashyncHandler(async (req, res) => {
     throw new ApiError(410, error?.message || "Invalid refresh token ");
   }
 });
+const updatePassword = ashyncHandler(async (req, res) => {
+  const { oldPassword, newPassword, confirmPassword } = req.body;
+  if (!(newPassword === confirmPassword)) {
+    throw new ApiError(400, "Password and confirm password does not match");
+  }
 
-export { registerUser, loginUser, logOutUser };
+  const user = await user.findById(req.user?._id);
+  const passwordCheck = await user.isPasswordCorrect(oldPassword);
+
+  if (!passwordCheck) {
+    throw new ApiError(400, "Incorrect old password");
+  }
+
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: false });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Password updated Successfully", {}));
+});
+
+const updateUserProfile = ashyncHandler(async (req, res) => {
+  const { fullName, email } = req.body;
+  if (!fullName || !email) {
+    throw new ApiError(400, "All fields are required");
+  }
+
+  const upadate = await user
+    .findByIdAndUpdate(
+      req.user?._id,
+      {
+        $set: {
+          fullName,
+          email,
+        },
+      },
+      { new: true } // this property new :true tells to return the new updated verson of data
+    )
+    .select("-password");
+  return res.status(
+    200,
+    new ApiResponse(200, "Profile updated successfully", user)
+  );
+});
+const getMe = ashyncHandler(async (req, res) => {
+  return res.status(
+    200,
+    new ApiResponse(200, "Profile fetch successfully", req.user)
+  );
+});
+const updateAvatar = ashyncHandler(async(req, res));
+
+export {
+  registerUser,
+  loginUser,
+  logOutUser,
+  updatePassword,
+  updateUserProfile,
+  getMe,
+  updateAvatar,
+};
