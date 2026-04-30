@@ -319,7 +319,63 @@ const getMe = ashyncHandler(async (req, res) => {
     new ApiResponse(200, "Profile fetch successfully", req.user)
   );
 });
-const updateAvatar = ashyncHandler(async(req, res));
+const updateAvatar = ashyncHandler(async (req, res) => {
+  //take file form local
+  // upload in cloudinary
+  // find user with id and update
+  // send responponse with updated avatar url
+  const avatarLocalPath = req.file?.path;
+  console.log(avatarLocalPath);
+  if (!avatarLocalPath) {
+    throw new ApiError(400, "Avatar file is required");
+  }
+  const newAvatar = await UploadInCloudinary(avatarLocalPath);
+  if (!newAvatar.url) {
+    throw new ApiError(400, "Error during the uploading to cloudinary");
+  }
+
+  const user = await user
+    .findByIdAndUpdate(
+      req.user._id,
+      {
+        $set: {
+          avatar: newAvatar?.url,
+        },
+      },
+      { new: true }
+    )
+    .select("-password");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Avatar image updated", user));
+});
+
+const updateCoverImage = ashyncHandler(async (req, res) => {
+  const localCoverImage = req.file?.path;
+  if (!localCoverImage) {
+    throw new ApiError(400, "Cover image is required");
+  }
+  const uploadCoverImage = await UploadInCloudinary(localCoverImage);
+  if (!updateCoverImage.url) {
+    throw new ApiError(400, "Error during coverImage upload in cloudinary");
+  }
+  const user = await user
+    .findByIdAndUpdate(
+      req.user._id,
+      {
+        $set: {
+          coverImage: uploadCoverImage.url,
+        },
+      },
+      { new: true }
+    )
+    .select("-password");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Cover image updated", user));
+});
 
 export {
   registerUser,
@@ -329,4 +385,5 @@ export {
   updateUserProfile,
   getMe,
   updateAvatar,
+  updateCoverImage,
 };
