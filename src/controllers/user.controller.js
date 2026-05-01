@@ -4,6 +4,7 @@ import { User } from "../model/user.models.js";
 import { UploadInCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const generateAccessandRefreshToken = async (userId) => {
   try {
@@ -396,7 +397,9 @@ const updateCoverImage = ashyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, "Cover image updated", user));
 });
-const getUserCahnnelProfile = ashyncHandler(async (req, res) => {
+
+// for get user channel profile we need to do some aggregation because we need to get the subscriber count and also we need to check is that user is subscribed to that channel or not so for this we need to do some aggregation in user model and also we need to do some lookup in subscription collection because we have the data of subscriber and channel in subscription collection so we will do lookup in subscription collection and then we will add some fields in our user model by using addFields and then we will return the response to client
+const getUserChannelProfile = ashyncHandler(async (req, res) => {
   const { username } = req.params;
   if (!username.trim()) {
     throw new ApiError(400, "Username is missing");
@@ -470,6 +473,58 @@ const getUserCahnnelProfile = ashyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "Channel details fetch successfully", Channel[0]))// we need to return the Channel[0] because agregation return an array and we need the first value from the array
 });
 
+// work on watch history now 
+const getWatchHistory = ashyncHandler(async (req, res) => {
+  const user = await User.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user._id)
+      }
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: watchHistory,
+        // now all video details came to our watch history field but from video owner field is not came yet for that we nee to create sub pipline need to look up on user table because the video owner is a user 
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: owner,// here we get all user data but we dont need all user data so we can create another one agregation call project and cut out some data from user which actually we need 
+              pipeline: [
+                {
+                  $project: {
+                    fullName: 1,
+                    username: 1,
+                    avatar: 1,
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+
+    },
+    {
+      $addFields: {
+        // now we have owner field in our watch history but its an array because we did lookup so we need to convert it into object because we know that for each video there is only one owner so we can use $arrayElemAt operator to convert it into object or we can use $first operator to covert it into object
+        // "watchHistory.owner": {
+        //   $arrayElemAt: ["$watchHistory.owner", 0] // here we are taking the first value from the owner array and converting it into object
+        // }
+        $first: "$watchHistory.owner" // this is another way to convert owner array into object by using $first operator which will take the first value from the owner array and convert it into object
+
+      }
+    }
+  ])
+
+  res.status(200)
+    .json(new ApiResponse(200, "Watch history fetch successfully", user[0].watchHistory))
+})
 
 export {
   registerUser,
@@ -481,4 +536,5 @@ export {
   updateAvatar,
   updateCoverImage,
   getUserChannelProfile,
+  getWatchHistory
 };
