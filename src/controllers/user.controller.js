@@ -76,7 +76,7 @@ const registerUser = ashyncHandler(async (req, res) => {
     fullName,
     email,
     avatar: avatar.url,
-    avatartPublicId: avatar.public_id,
+    avatarPublicId: avatar.public_id,
     coverImage: coverImage?.url || "",
     coverImagePublicId: coverImage?.public_id || "",
     password,
@@ -349,7 +349,7 @@ const updateAvatar = ashyncHandler(async (req, res) => {
       req.user._id,
       {
         $set: {
-          avatartPublicId: newAvatar.public_id,
+          avatarPublicId: newAvatar.public_id,
           avatar: newAvatar?.url,
         },
       },
@@ -396,6 +396,80 @@ const updateCoverImage = ashyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, "Cover image updated", user));
 });
+const getUserCahnnelProfile = ashyncHandler(async (req, res) => {
+  const { username } = req.params;
+  if (!username.trim()) {
+    throw new ApiError(400, "Username is missing");
+  }
+
+  const Channel = await User.aggregate([
+    {
+      $match: {
+        username: username.toLowerCase(), // match this field and take those who match
+      },
+    },
+    {
+      //create subscribers
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+    {
+      //create subscribed to
+      $lookup: {
+        form: "subscriptions", //db collection name
+        localField: "_id", // name in subscriptions collection
+        foreignField: "subscriber", // name in other table here we have same table
+        as: "subscribedTo", // save the details by subscribedTo name (**this will return an array of object)
+      },
+    },
+    {
+      // for add new field in user  table
+      $addFields: {
+        //how many subscribers this cahi_code channel has returns number
+        subscriberCount: {
+          $size: "$subscribers",
+        },
+        //how many channel this chai_code user has subscribed retun number
+        channelsSubscribedToCount: {
+          $size: "subscribedTo",
+        },
+        isSubscribed: {
+          //for check condetions cond
+          $cond: {
+            //if to check its takes 2 value then and else
+            $if: { $in: [req.user?._id, "$subscribers.subscriber"] }, // "in" for check does this user id avalible in subscribers field (for array we do this). we have here object thats why we put subscribers.subscriber ** exact field
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        fullName: 1,
+        username: 1,
+        avatar: 1,
+        coverImage: 1,
+        subscriberCount: 1,
+        channelsSubscribedToCount: 1,
+        isSubscribed: 1,
+        email: 1,
+      },
+    },
+  ]);
+  console.log(Channel);
+
+  if (!Channel.length) {
+    throw new ApiError(400, "Channel does not exists")
+  }
+  return res.status(200)
+    .json(new ApiResponse(200, "Channel details fetch successfully", Channel[0]))// we need to return the Channel[0] because agregation return an array and we need the first value from the array
+});
+
 
 export {
   registerUser,
@@ -406,4 +480,5 @@ export {
   getMe,
   updateAvatar,
   updateCoverImage,
+  getUserChannelProfile,
 };
