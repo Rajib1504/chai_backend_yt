@@ -65,7 +65,8 @@ const registerUser = ashyncHandler(async (req, res) => {
   //upload to cloudinary
   const avatar = await UploadInCloudinary(avatarLocalPath);
   const coverImage = await UploadInCloudinary(coverImageLocalPath);
-
+  // console.log("this is from avatar", avatar);
+  // console.log("this is from coverImage", coverImage);
   if (!avatar) {
     throw new ApiError(400, "Avatar file is required from local path");
   }
@@ -75,14 +76,16 @@ const registerUser = ashyncHandler(async (req, res) => {
     fullName,
     email,
     avatar: avatar.url,
+    avatartPublicId: avatar.public_id,
     coverImage: coverImage?.url || "",
+    coverImagePublicId: coverImage?.public_id || "",
     password,
     username: username.toLowerCase(),
   });
 
   //check user created or not and return response without password and refreshtoken
   const createdUser = await User.findById(user._id).select(
-    " -password -refreshToken"
+    " -password -refreshToken -avatarPublicId -coverImagePublicId"
   ); //select method to select something and -negative means remove this field form
 
   if (!createdUser) {
@@ -334,17 +337,25 @@ const updateAvatar = ashyncHandler(async (req, res) => {
     throw new ApiError(400, "Error during the uploading to cloudinary");
   }
 
+  //take the old avatar public id from user and delete the old avatar from cloudinary
+  const oldAvatarPublicId = req.user.avatarPublicId;
+  if (!oldAvatarPublicId) {
+    console.log("no old avatar public id found for this user");
+  }
+  await deleteFromCloudinary(oldAvatarPublicId);
+
   const user = await user
     .findByIdAndUpdate(
       req.user._id,
       {
         $set: {
+          avatartPublicId: newAvatar.public_id,
           avatar: newAvatar?.url,
         },
       },
       { new: true }
     )
-    .select("-password");
+    .select("-password -avatarPublicId -coverImagePublicId -refreshToken");
 
   return res
     .status(200)
@@ -360,17 +371,26 @@ const updateCoverImage = ashyncHandler(async (req, res) => {
   if (!updateCoverImage.url) {
     throw new ApiError(400, "Error during coverImage upload in cloudinary");
   }
+
+  //take the old cover image public id from user and delete the old cover image from cloudinary
+  const oldCoverImagePublicId = req.user.coverImagePublicId;
+  if (!oldCoverImagePublicId) {
+    console.log("no old cover image public id found for this user");
+  }
+  await deleteFromCloudinary(oldCoverImagePublicId);
+
   const user = await user
     .findByIdAndUpdate(
       req.user._id,
       {
         $set: {
+          coverImagePublicId: uploadCoverImage.public_id,
           coverImage: uploadCoverImage.url,
         },
       },
       { new: true }
     )
-    .select("-password");
+    .select("-password -coverImagePublicId -avatarPublicId -refreshTokenF");
 
   return res
     .status(200)
